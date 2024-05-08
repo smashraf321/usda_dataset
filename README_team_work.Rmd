@@ -1,0 +1,308 @@
+---
+title: 'DS 202 - Project Proposal'
+author: "Save Gaza"
+output: html_document
+date: "03-29-2024"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analysis of agricultural economics statistics in the US
+
+We want to analyze the agricultural economics statistics in the US. We are using [real world data](https://www.nass.usda.gov/datasets/) from the USDA NASS. 
+Our specific dataset is `qs.economics_20240329.gz`
+
+## Team Members
+
+Hazer Becic, Ashraf Shaikh Mohammed, Luis Hinkhouse, Mohamed Bashier, Mazin Bashier.
+
+## Data
+
+Our data is present as a zipped txt file in tab separated format. It appears the data is relatively clean on the first glance, so we assume not much intensive data cleaning needs to be done.
+
+There's [accompanying documentation](https://quickstats.nass.usda.gov/src/glossary.pdf) to understand certain values in our dataset.
+
+```{r, message=FALSE, echo=FALSE}
+
+library(rvest)
+library(tidyverse)
+
+url <- "https://www.nass.usda.gov/datasets/"
+html_content <- read_html(url)
+text_strings <- html_content %>% html_nodes("div") %>% lapply(function(x) {x %>% html_text() %>% trimws()})
+pattern <- "^qs\\.economics_\\d+\\.txt\\.gz$"
+matches <- regmatches(text_strings, regexpr(pattern, text_strings))
+print(matches)
+data_url <- paste("https://www.nass.usda.gov/datasets/", matches, sep = "")
+print(data_url)
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+#url <- "https://www.nass.usda.gov/datasets/qs.economics_20240329.txt.gz"
+
+usda_dataset <- matches
+#usda_dataset <- 'qs.economics_20240329.txt.gz'
+if (!file.exists(usda_dataset))
+{
+  download.file(data_url, destfile = usda_dataset, mode = 'wb')
+}
+
+# This step takes a while so please be patient
+suppressWarnings(data_usda <- read.delim(gzfile(usda_dataset)))
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+#nrow(data_usda)
+# We have a whopping 11,695,604 rows in our dataset
+
+#length(colnames(data_usda))
+# We have 39 columns in our dataset
+
+#dim(data_usda)
+
+colnames(data_usda)
+```
+
+
+We see we have 39 columns containing lots of valuable information. We shall now see a preview of certain columns.
+
+```{r, message=FALSE, echo=FALSE}
+# Preview certain columns
+data_usda_preview <- data_usda %>% 
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC)
+
+str(data_usda_preview)
+
+data_usda_preview %>% head(n = 20)
+```
+
+
+## Questions to be addressed
+
+We want to see what agricultural economic sectors are present in various states in the US as well as their growth/decline over the years.
+
+
+mazin-
+```{r}
+library(dplyr)
+
+
+data_usda_preview$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_preview$VALUE))
+
+
+cattle_data <- data_usda_preview %>%
+  filter(COMMODITY_DESC == "CATTLE") %>%
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC) %>%
+  mutate(VALUE = as.numeric(VALUE)) 
+average_cattle_value_by_state <- cattle_data %>%
+  group_by(STATE_NAME) %>%
+  summarise(Average_Value = mean(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(desc(Average_Value))
+
+
+print(head(average_cattle_value_by_state, n = 20))
+
+
+```
+
+#This data reveals the average revenue from cattle sales,shaped by market demand, pricing strategies, and economic factors. It highlights how external changes impact profitability, guiding decisions to optimize the cattle industry.
+
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Assuming 'data_usda_preview' is already loaded and contains the necessary columns
+# Filter for 'CATTLE' at the national level
+national_cattle_data <- data_usda_preview %>%
+  filter(COMMODITY_DESC == "CATTLE", STATE_NAME == "US TOTAL") %>%
+  mutate(YEAR = as.numeric(YEAR),  # Ensure YEAR is numeric
+         VALUE = as.numeric(gsub("[^0-9.]", "", VALUE)))  # Clean and convert VALUE to numeric
+
+# Calculate the total production value by year for 'CATTLE' at the national level
+cattle_trends_national <- national_cattle_data %>%
+  group_by(YEAR) %>%
+  summarise(Total_Value = sum(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(YEAR)
+
+# Plot the trend over years
+ggplot(cattle_trends_national, aes(x = YEAR, y = Total_Value)) +
+  geom_line() +
+  geom_point() +  # Add points to visualize each year's data
+  theme_minimal() +
+  labs(title = "Trend of Cattle Production Value at the National Level",
+       x = "Year",
+       y = "Total Production Value ($)")
+
+```
+#Background:
+#Cattle production plays a critical role in the U.S. agricultural sector, contributing significantly to the national economy. Analyzing the trends in production values over the years can provide insights into the economic health of this sector, impacts of market changes, and potential effects of agricultural policies.
+#Objective:
+#To examine the national trends in cattle production values over the years, identifying periods of growth or decline that may correlate with external factors such as market dynamics, policy changes, or other economic conditions.
+
+# I chose this type of graph because it is easier to read the data from. It does consider inflation since it not in the data and part of the production value. 
+
+
+
+
+
+
+
+#Hazer Becic
+#Question: How does the distribution of agricultural expenses vary across different states in the United States over the years?
+```{r}
+agri_expenses <- data_usda %>%
+  filter(GROUP_DESC == "EXPENSES")
+
+agg_expenses <- agri_expenses %>%
+  group_by(STATE_NAME, YEAR) %>%
+  summarise(total_expenses = sum(as.numeric(gsub(",", "", VALUE))))
+
+  
+ggplot(agg_expenses, aes(x = YEAR, y = total_expenses, color = STATE_NAME)) +
+  geom_line() +
+  labs(title = "Total Agricultural Expenses Over Years by State",
+       x = "Year",
+       y = "Total Expenses",
+       color = "State") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Adjusts the legend position to the bottom
+
+
+
+
+# Filter the data to include only expenses
+agri_expenses <- data_usda %>%
+  filter(GROUP_DESC == "EXPENSES")
+
+# Group by state and year, then calculate total expenses
+agg_expenses <- agri_expenses %>%
+  group_by(STATE_NAME, YEAR) %>%
+  summarise(total_expenses = sum(as.numeric(gsub(",", "", VALUE))))
+
+# Plot total expenses over years for each state
+ggplot(agg_expenses, aes(x = YEAR, y = as.numeric(total_expenses), color = STATE_NAME)) +
+  geom_line() +
+  labs(title = "Total Agricultural Expenses Over Years by State",
+       x = "Year",
+       y = "Total Expenses",
+       color = "State") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Adjusts the legend position to the bottom
+
+
+
+
+
+
+
+#Question: which specific sectors make the most impact on total expenses?
+
+library(dplyr)
+
+
+data_usda <- data_usda %>%
+  mutate(VALUE = gsub("[^0-9.]", "", VALUE),  # Remove non-numeric characters, keep digits and decimal points
+         VALUE = as.numeric(VALUE))  # Convert the cleaned string to numeric
+selected_states_data <- data_usda %>%
+  filter(STATE_NAME %in% c("VIRGINIA", "WYOMING", "WISCONSIN"))
+
+expenses_by_sector <- selected_states_data %>%
+  group_by(STATE_NAME, GROUP_DESC) %>%
+  summarise(Total_Expenses = sum(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(STATE_NAME, desc(Total_Expenses))
+
+print(expenses_by_sector)
+
+
+
+library(ggplot2)
+
+ggplot(expenses_by_sector, aes(x = GROUP_DESC, y = Total_Expenses, fill = STATE_NAME)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Total Agricultural Expenses by Sector and State",
+       x = "Group Description",
+       y = "Total Expenses") +
+  theme_minimal() +
+  facet_wrap(~STATE_NAME) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+```
+#In this first graph we can see that Virginia had the highest expenses in each decade.
+#With Wyoming and Wisconsin also among the states with the highest expenses. No other state came close to the total agricultural expenses as these three states. 
+#" In the second graph We wanted to analyze which sectors are associated with higher total expenses. To do this we counted the mean number of times each unique sector came up and then filtered by the top five. We wanted to see if there was an association between these sectors and the top three states that we selected. Farms & Lands & Assets had the highest total expenses for these states. Followed by Income and then expenses Those 3 sectors are associated with higher total expenses. However, these states didn't have any values for the other two sectors provided in the graph. This is due to a variety of reasons including climate/geography, market demand, and government policy."
+
+#Mohamed
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+
+
+# Question 1: How has the total agricultural production changed over the years?
+
+
+data_usda <- data_usda %>%
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC) %>%
+  mutate(VALUE = as.numeric(VALUE))
+
+
+production_over_years <- data_usda %>%
+  group_by(YEAR) %>%
+  summarise(Total_Production = sum(VALUE, na.rm = TRUE)) %>%
+  filter(!(YEAR > 2000 & Total_Production == 0))  # Exclude years after 2000 with zero total production
+
+
+production_over_years <- production_over_years %>%
+  mutate(Change = Total_Production - lag(Total_Production, default = first(Total_Production)),
+         Is_Increasing = Change >= 0)
+
+
+first_decline_year <- min(production_over_years$YEAR[production_over_years$Is_Increasing == FALSE], na.rm = TRUE)
+
+
+production_over_years <- production_over_years %>%
+  filter(YEAR < first_decline_year)
+
+ggplot(production_over_years, aes(x = YEAR, y = Total_Production)) +
+  geom_line() +
+  labs(title = "Trend of Total Agricultural Production Over the Years",
+       x = "Year",
+       y = "Total Production") +
+  theme_minimal()
+  
+```
+#As shown from the figure, there is a quite obvious increase in production as the years have gone by. As obvious, there is going to be a slow start as agricultural practices, technological advances, and farming practices were not as popular. We can even presume that it was very low to the point agriculture was barely economically beneficial. As the years go by, new methods, technologies, and practices are introduced, so that explains the rapid incline of total agricultural production.
+
+```{r}
+# Question 2: What are the average values of labor operations across states for 2017?
+
+library(dplyr)
+library(ggplot2)
+
+
+labor_hours_per_operation_analysis <- data_usda %>%
+  filter(COMMODITY_DESC == "LABOR", 
+         YEAR == 2017, 
+         UNIT_DESC == "OPERATIONS", 
+         !grepl("total", STATE_NAME, ignore.case = TRUE)) %>% # Enhanced to catch variations of 'total'
+  group_by(STATE_NAME) %>%
+  summarise(Average_Labor_Hours_Per_Operation = mean(as.numeric(VALUE), na.rm = TRUE)) %>%
+  arrange(desc(Average_Labor_Hours_Per_Operation))
+
+
+ggplot(labor_hours_per_operation_analysis, aes(x = reorder(STATE_NAME, Average_Labor_Hours_Per_Operation), y = Average_Labor_Hours_Per_Operation)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Average Labor Hours per Operation by State in 2017",
+       x = "State",
+       y = "Average Labor Hours per Operation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+#When looking at the different states of the United States, a question that would be interesting to know is how different the average values of labor operations differ across the,. In our case, we are looking at the year 2017 specifically. Here, we want to see which states show proof of the highest labor hours per operation throughout that year. From the results, we can see that California has the highest average labor hours per operation, which seems reasonable. There are different factors that affect these labor hours, like the type of crops grown, the geographical location, and the variety of high-grown crops. On the opposite side of the graph, we can see that Alaska has the least average labor hours per operation, which makes sense. Due to the cold weather, agricultural practices are barely performed as it would be hard. In conclusion, this graph helps show which states have the highest average labor hours operations versus the lowest, ranking them in order.

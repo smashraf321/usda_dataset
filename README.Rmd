@@ -1,12 +1,12 @@
 ---
 title: 'DS 202 - Project Proposal'
 author: "Save Gaza"
-output: html_document
+output: github_document
 date: "03-29-2024"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ## Analysis of agricultural economics statistics in the US
@@ -23,6 +23,17 @@ Hazer Becic, Ashraf Shaikh Mohammed, Luis Hinkhouse, Mohamed Bashier, Mazin Bash
 Our data is present as a zipped txt file in tab separated format. It appears the data is relatively clean on the first glance, so we assume not much intensive data cleaning needs to be done.
 
 There's [accompanying documentation](https://quickstats.nass.usda.gov/src/glossary.pdf) to understand certain values in our dataset.
+
+## Introduction
+
+- Agricultural economics statistics data set by the United States Department of Agriculture (USDA)
+
+- Used for economic analysis aimed at understanding trends and impacts regarding the agricultural sector
+
+- Data spans across multiple geographical levels, national, regional, and states with the United States.
+
+- In our data we have many variables that help us learn about what agricultural economic sectors are present in various states in the US as well as their growth/decline over the years.
+
 
 ```{r, message=FALSE, echo=FALSE}
 
@@ -45,44 +56,28 @@ print(data_url)
 options(timeout=120)
 
 usda_dataset <- matches
-#usda_dataset <- 'qs.economics_20240329.txt.gz'
 if (!file.exists(usda_dataset))
 {
   download.file(data_url, destfile = usda_dataset, mode = 'wb')
 }
 
-# This step takes a while so please be patient
+# This step takes a while when knitting so please be patient
 suppressWarnings(data_usda <- read.delim(gzfile(usda_dataset)))
 
 ```
 
 ```{r, message=FALSE, echo=FALSE}
-#nrow(data_usda)
-# We have a whopping 11,695,604 rows in our dataset
 
-#length(colnames(data_usda))
+length(colnames(data_usda))
 # We have 39 columns in our dataset
 
-#dim(data_usda)
+dim(data_usda)
 
 colnames(data_usda)
 ```
 
 
-We see we have 39 columns containing lots of valuable information. We shall now see a preview of certain columns.
-
-```{r, message=FALSE, echo=FALSE}
-# Preview certain columns
-data_usda_preview <- data_usda %>% 
-  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC, COUNTRY_NAME)
-
-str(data_usda_preview)
-
-data_usda_preview %>% head(n = 20)
-
-
-```
-
+We see we have 39 columns containing lots of valuable information.- 
 
 ```{r, message=FALSE, echo=FALSE}
 
@@ -91,26 +86,20 @@ data_usda_preview %>% head(n = 20)
 data_usda <- data_usda %>% select(SOURCE_DESC, GROUP_DESC,
                      COMMODITY_DESC, STATISTICCAT_DESC, AGG_LEVEL_DESC, DOMAIN_DESC,
                      COUNTRY_NAME, STATE_NAME,
-                     FREQ_DESC, YEAR, REFERENCE_PERIOD_DESC, VALUE, UNIT_DESC)
+                     YEAR, REFERENCE_PERIOD_DESC, VALUE, UNIT_DESC)
 
-# REFERENCE_PERIOD_DESC - for months
-# VALUE - remove D's, replace commas
-# FREQ_DESC -
-# YEAR -
-# COMMODITY_DESC -
+# REFERENCE_PERIOD_DESC - for selecting years for annual statistics
+# VALUE - stat values; remove D's, Withheld to avoid disclosing data for individual operations
+# UNIT_DESC - measurement units for our values
+# YEAR - for year info
+# COMMODITY_DESC - sectors classification
 # STATISTICCAT_DESC - higher level of DOMAIN_DESC
-# COUNTRY_NAME -
+# COUNTRY_NAME - for USA and not territories like Puerto Rico
 # STATE_NAME - ignore "" empty state; US TOTAL and OTHER STATES for statewise analysis
-# UNIT_DESC -
-# GROUP_DESC -
-# SOURCE_DESC - let's only care about census data
-# AGG_LEVEL_DESC -
-# DOMAIN_DESC - maybe but mostly yes, seems more detailed than STATISTICCAT_DESC
-
-# CLASS_DESC maybe, not so important
-# PRODN_PRACTICE_DESC maybe, not so important
-# UTIL_PRACTICE_DESC maybe, not so important
-
+# GROUP_DESC - Highest level sector classification
+# SOURCE_DESC - we care about census data and not survey data as census is more accurate
+# AGG_LEVEL_DESC - to select geographical level, state, national, so on
+# DOMAIN_DESC - more detailed sector classification than STATISTICCAT_DESC
 
 
 data_usda <- data_usda %>% filter(SOURCE_DESC == "CENSUS",
@@ -120,51 +109,22 @@ data_usda <- data_usda %>% filter(SOURCE_DESC == "CENSUS",
 data_usda <- data_usda %>% filter(STATE_NAME != "",
                                   REFERENCE_PERIOD_DESC == "YEAR") %>% select(-c(REFERENCE_PERIOD_DESC))
 
-data_usda <- data_usda %>% select(-c(FREQ_DESC))
-
-
-#head(data_usda$VALUE, 200)
-
 ```
 
-```{r, message=FALSE, echo=FALSE}
+# Questions to be addressed
 
-colnames(data_usda)
+## Agricultural land area operations
 
-#data_usda %>% select(-c(VALUE, STATISTICCAT_DESC, DOMAIN_DESC, COMMODITY_DESC)) %>% sapply(unique)
+### Question:
 
-data_usda_test <- data_usda %>% filter(GROUP_DESC == "ENERGY"
-#                                       ,COMMODITY_DESC == "AG LAND",
-#                                       ,STATISTICCAT_DESC == "AREA",
-#                                       ,DOMAIN_DESC == "AREA OPERATED" | DOMAIN_DESC == "AREA" | DOMAIN_DESC == "AREA HARVESTED"
-)
+How much effort do farmers put into helping crop harvesting?
 
+### Objective:
 
-#unique(data_usda$YEAR)
-#unique(data_usda$UNIT_DESC)
-print("------GROUP_DESC------")
-unique(data_usda_test$GROUP_DESC)
-print("------COMMODITY_DESC------")
-unique(data_usda_test$COMMODITY_DESC)
-print("------STATISTICCAT_DESC------")
-unique(data_usda_test$STATISTICCAT_DESC)
-print("------AGG_LEVEL_DESC------")
-unique(data_usda_test$AGG_LEVEL_DESC)
-print("------DOMAIN_DESC------")
-unique(data_usda_test$DOMAIN_DESC)
-print("------UNIT_DESC------")
-unique(data_usda$UNIT_DESC)
+- Area of cropland harvested without human intervention vs area of cropland harvested after human intervention.
 
-#data_usda_test <- data_usda_test %>% filter(STATE_NAME == "IOWA", AGG_LEVEL_DESC == "STATE")
-dim(data_usda_test)
+- Change over the years
 
-# do like convert years, states to factors, etc.
-# now our data is ready for analysis
-```
-
-## Questions to be addressed
-
-We want to see what agricultural economic sectors are present in various states in the US as well as their growth/decline over the years.
 
 ```{r, message=FALSE, echo=FALSE}
 
@@ -177,7 +137,6 @@ data_usda_AG_LAND_AREA_IOWA <- data_usda_AG_LAND_AREA %>% filter(STATE_NAME == "
                                                                  ,UNIT_DESC == "ACRES"
                                                                  )
 
-unique(data_usda_AG_LAND_AREA_IOWA$DOMAIN_DESC)
 
 data_usda_AG_LAND_AREA_IOWA <- data_usda_AG_LAND_AREA_IOWA %>% filter(
   DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
@@ -195,7 +154,9 @@ testt <- data_usda_AG_LAND_AREA_IOWA %>%
 
 #View(testt)
 
-testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") #+ coord_flip()
+testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") + labs(title = "Operated/harvested ag land area in iowa",
+       x = "years",
+       y = "land area in acres")
 
 
 #data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
@@ -213,7 +174,6 @@ data_usda_AG_LAND_AREA_NEBRASKA <- data_usda_AG_LAND_AREA %>% filter(STATE_NAME 
                                                                  ,UNIT_DESC == "ACRES"
                                                                  )
 
-unique(data_usda_AG_LAND_AREA_NEBRASKA$DOMAIN_DESC)
 
 data_usda_AG_LAND_AREA_NEBRASKA <- data_usda_AG_LAND_AREA_NEBRASKA %>% filter(
   DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
@@ -231,7 +191,9 @@ testt <- data_usda_AG_LAND_AREA_NEBRASKA %>%
 
 #View(testt)
 
-testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") #+ coord_flip()
+testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") + labs(title = "Operated/harvested ag land area in Nebraska",
+       x = "years",
+       y = "land area in acres")
 
 
 #data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
@@ -250,7 +212,6 @@ data_usda_AG_LAND_AREA_2 <- data_usda_AG_LAND_AREA_2 %>% filter(AGG_LEVEL_DESC =
                                                                  ,UNIT_DESC == "ACRES"
                                                                  )
 
-unique(data_usda_AG_LAND_AREA_2$DOMAIN_DESC)
 
 data_usda_AG_LAND_AREA_2 <- data_usda_AG_LAND_AREA_2 %>% filter(
   DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
@@ -276,6 +237,33 @@ testt %>% ggplot(aes(x = YEAR, y = land_area)) + geom_bar(stat = "identity", aes
 
 
 ```
+### Analysis:
+
+- Downward trend of natural harvest over the years - Texas
+
+- Upward trend of operational harvest over the years (in comparison to natural) - North Dakota
+
+#### Stuff that we may learn from this
+
+- Nature changes - like less rain
+
+- Extreme but maybe evolving species (weeds, bugs)
+
+- California, Texas, Iowa, Delaware sizes to cropland ratio. 
+
+## Financial Operational Efficiency for 2009
+
+### Question:
+
+"What are the trends in financial operational efficiency for the business operations across all sectors in the US?"
+
+### Background:
+
+We have data only for 2009 for this metric in our dataset. Energy finances is an important metric to measure efficiency of operations for businesses.
+
+### Objective:
+To examine the national trends in energy expenses and savings as it relates to `dollars per operations` and identify states where businesses need to focus on optimizing their operations.
+
 
 ```{r, message=FALSE, echo=FALSE}
 data_usda_ENERGY <- data_usda %>% filter(GROUP_DESC == "ENERGY"
@@ -296,7 +284,9 @@ testt <- data_usda_ENERGY_IOWA %>%
 
 
 
-testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") #+ coord_flip()
+testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") + labs(title = "Business Operational efficiency in Iowa",
+       x = "Expense and Savings in 2009",
+       y = "Dollars per operations")
 
 ```
 
@@ -327,11 +317,21 @@ testt <- data_usda_ENERGY_TEXAS %>%
 
 #View(testt)
 
-testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") #+ coord_flip()
+testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") + labs(title = "Business Operational efficiency in Texas",
+       x = "Expense and Savings in 2009",
+       y = "Dollars per operations")
 
 
 #data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
 ```
+### Iowa VS Texas
+
+- Iowa spends more dollars per operations than Texas.
+
+- Iowa and Texas both have similar savings in dollars per operations
+
+- Texas thus has more operational efficiency than Iowa.
+
 
 ```{r, message=FALSE, echo=FALSE}
 
@@ -384,9 +384,47 @@ data_usda_ENERGY_ALL_EXPENSES %>% group_by(STATE_NAME) %>% summarize(dollars_per
 
 ```
 
-## MAZIN MOHAMMED
+### Analysis for 50 states
+
+- Louisiana is an outlier. Has no savings in 2009.
+
+- Delaware and New Jersey have very inefficient operations for smaller states.
+
+- Potential opportunities for innovation in such states.
+
+- New Jersey has the largest expenditure.
+
+- New York has the largest savings.
+
+
+## Cattle Production
+
+This data reveals the average revenue from cattle sales,shaped by market demand, pricing strategies, and economic factors. It highlights how external changes impact profitability, guiding decisions to optimize the cattle industry.
+
+### Background:
+
+Cattle production plays a critical role in the U.S. agricultural sector, contributing significantly to the national economy. Analyzing the trends in production values over the years can provide insights into the economic health of this sector, impacts of market changes, and potential effects of agricultural policies.
+
+### Objective:
+
+To examine the national trends in cattle production values over the years, identifying periods of growth or decline that may correlate with external factors such as market dynamics, policy changes, or other economic conditions.
+
+I chose this type of graph because it is easier to read the data from. It does not consider inflation since it not in the data and part of the production value.
 
 ```{r, message=FALSE, echo=FALSE}
+
+data_usda_preview <- data_usda %>% 
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC)
+
+str(data_usda_preview)
+
+data_usda_preview %>% head(n = 20)
+```
+
+```{r}
+library(dplyr)
+
+
 data_usda_preview$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_preview$VALUE))
 
 
@@ -401,12 +439,17 @@ average_cattle_value_by_state <- cattle_data %>%
 
 
 print(head(average_cattle_value_by_state, n = 20))
+
+
 ```
 
 ```{r, message=FALSE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+
 # Assuming 'data_usda_preview' is already loaded and contains the necessary columns
 # Filter for 'CATTLE' at the national level
-national_cattle_data <- data_usda_preview %>%
+national_cattle_data <- data_usda_cp %>%
   filter(COMMODITY_DESC == "CATTLE", STATE_NAME == "US TOTAL") %>%
   mutate(YEAR = as.numeric(YEAR),  # Ensure YEAR is numeric
          VALUE = as.numeric(gsub("[^0-9.]", "", VALUE)))  # Clean and convert VALUE to numeric
@@ -425,11 +468,15 @@ ggplot(cattle_trends_national, aes(x = YEAR, y = Total_Value)) +
   labs(title = "Trend of Cattle Production Value at the National Level",
        x = "Year",
        y = "Total Production Value ($)")
+
 ```
 
 
-## Hazer Becic
-Question: How does the distribution of agricultural expenses vary across different states in the United States over the years?
+## Overall expenses
+
+### Question
+
+How does the distribution of agricultural expenses vary across different states in the United States over the years?
 
 ```{r, message=FALSE, echo=FALSE}
 agri_expenses <- data_usda %>%
@@ -439,7 +486,7 @@ agg_expenses <- agri_expenses %>%
   group_by(STATE_NAME, YEAR) %>%
   summarise(total_expenses = sum(as.numeric(gsub(",", "", VALUE))))
 
-# HAS WARNINGS  
+  
 ggplot(agg_expenses, aes(x = YEAR, y = total_expenses, color = STATE_NAME)) +
   geom_line() +
   labs(title = "Total Agricultural Expenses Over Years by State",
@@ -448,38 +495,152 @@ ggplot(agg_expenses, aes(x = YEAR, y = total_expenses, color = STATE_NAME)) +
        color = "State") +
   theme_minimal() +
   theme(legend.position = "bottom")  # Adjusts the legend position to the bottom
-```
 
 
 
-Question: What are the main drivers of agricultural income variation across different regions in the United States, and how have these drivers evolved over time? 
-```{r, message=FALSE, echo=FALSE}
-agri_income <- data_usda %>%
-  filter(GROUP_DESC == "INCOME")
 
-# DOESN'T WORK
-# Step 2: Explore the distribution of agricultural income across different regions and years
-income_summary <- agri_income %>%
-  group_by(REGION_DESC, YEAR) %>%
-  summarise(total_income = sum(as.numeric(gsub(",", "", VALUE))))
+# Filter the data to include only expenses
+agri_expenses <- data_usda %>%
+  filter(GROUP_DESC == "EXPENSES")
 
-# Step 3: Correlation analysis - Identify potential drivers of income variation
-# For example, let's explore the correlation between income and commodity prices
-# Assuming you have another dataset named commodity_prices containing commodity price data
+# Group by state and year, then calculate total expenses
+agg_expenses <- agri_expenses %>%
+  group_by(STATE_NAME, YEAR) %>%
+  summarise(total_expenses = sum(as.numeric(gsub(",", "", VALUE))))
 
-# Merge commodity price data with income data based on common variables (e.g., year and commodity)
-merged_data <- inner_join(income_summary, commodity_prices, by = c("YEAR", "COMMODITY_DESC"))
-
-# Calculate correlation between income and commodity prices
-correlation <- cor(merged_data$total_income, merged_data$price)
-
-# Step 4: Data Visualization
-# Plotting total agricultural income over the years for each region
-ggplot(income_summary, aes(x = YEAR, y = total_income, color = REGION_DESC)) +
+# Plot total expenses over years for each state
+ggplot(agg_expenses, aes(x = YEAR, y = as.numeric(total_expenses), color = STATE_NAME)) +
   geom_line() +
-  labs(title = "Total Agricultural Income Over Years by Region",
+  labs(title = "Total Agricultural Expenses Over Years by State",
        x = "Year",
-       y = "Total Income",
-       color = "Region") +
-  theme_minimal()
+       y = "Total Expenses",
+       color = "State") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Adjusts the legend position to the bottom
+
+
+
+
+
+
+
+#Question: which specific sectors make the most impact on total expenses?
+
+library(dplyr)
+
+
+data_usda_agexp <- data_usda %>%
+  mutate(VALUE = gsub("[^0-9.]", "", VALUE),  # Remove non-numeric characters, keep digits and decimal points
+         VALUE = as.numeric(VALUE))  # Convert the cleaned string to numeric
+selected_states_data <- data_usda_agexp %>%
+  filter(STATE_NAME %in% c("VIRGINIA", "WYOMING", "WISCONSIN"))
+
+expenses_by_sector <- selected_states_data %>%
+  group_by(STATE_NAME, GROUP_DESC) %>%
+  summarise(Total_Expenses = sum(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(STATE_NAME, desc(Total_Expenses))
+
+print(expenses_by_sector)
+
+
+
+library(ggplot2)
+
+ggplot(expenses_by_sector, aes(x = GROUP_DESC, y = Total_Expenses, fill = STATE_NAME)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Total Agricultural Expenses by Sector and State",
+       x = "Group Description",
+       y = "Total Expenses") +
+  theme_minimal() +
+  facet_wrap(~STATE_NAME) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
+
+### First graph
+
+In this first graph we can see that Virginia had the highest expenses in each decade.
+
+With Wyoming and Wisconsin also among the states with the highest expenses. No other state came close to the total agricultural expenses as these three states. 
+
+### Second graph
+
+In the second graph We wanted to analyze which sectors are associated with higher total expenses. To do this we counted the mean number of times each unique sector came up and then filtered by the top five. We wanted to see if there was an association between these sectors and the top three states that we selected. Farms & Lands & Assets had the highest total expenses for these states. Followed by Income and then expenses Those 3 sectors are associated with higher total expenses. However, these states didn't have any values for the other two sectors provided in the graph. This is due to a variety of reasons including climate/geography, market demand, and government policy.
+
+## Trends in Agricultural Production: A Historical Analysis
+
+### Potential Reasons:
+
+Introduction of high-yield crop varieties, chemical fertilizers, and advanced farming methods have all played crucial roles in increasing productivity.
+
+### Future Benefits:
+By studying these changes, policymakers, researchers, and stakeholders can better understand the pressures on agricultural systems and make informed decisions that balance productivity with sustainability and economic viability.
+
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+
+
+# Question 1: How has the total agricultural production changed over the years?
+
+
+data_usda_a <- data_usda %>%
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC) %>%
+  mutate(VALUE = as.numeric(VALUE))
+
+
+production_over_years <- data_usda_a %>%
+  group_by(YEAR) %>%
+  summarise(Total_Production = sum(VALUE, na.rm = TRUE)) %>%
+  filter(!(YEAR > 2000 & Total_Production == 0))  # Exclude years after 2000 with zero total production
+
+
+production_over_years <- production_over_years %>%
+  mutate(Change = Total_Production - lag(Total_Production, default = first(Total_Production)),
+         Is_Increasing = Change >= 0)
+
+
+first_decline_year <- min(production_over_years$YEAR[production_over_years$Is_Increasing == FALSE], na.rm = TRUE)
+
+
+production_over_years <- production_over_years %>%
+  filter(YEAR < first_decline_year)
+
+ggplot(production_over_years, aes(x = YEAR, y = Total_Production)) +
+  geom_line() +
+  labs(title = "Trend of Total Agricultural Production Over the Years",
+       x = "Year",
+       y = "Total Production") +
+  theme_minimal()
+  
+```
+
+As shown from the figure, there is a quite obvious increase in production as the years have gone by. As obvious, there is going to be a slow start as agricultural practices, technological advances, and farming practices were not as popular. We can even presume that it was very low to the point agriculture was barely economically beneficial. As the years go by, new methods, technologies, and practices are introduced, so that explains the rapid incline of total agricultural production.
+
+```{r}
+# Question 2: What are the average values of labor operations across states for 2017?
+
+library(dplyr)
+library(ggplot2)
+
+
+labor_hours_per_operation_analysis <- data_usda %>%
+  filter(COMMODITY_DESC == "LABOR", 
+         YEAR == 2017, 
+         UNIT_DESC == "OPERATIONS", 
+         !grepl("total", STATE_NAME, ignore.case = TRUE)) %>% # Enhanced to catch variations of 'total'
+  group_by(STATE_NAME) %>%
+  summarise(Average_Labor_Hours_Per_Operation = mean(as.numeric(VALUE), na.rm = TRUE)) %>%
+  arrange(desc(Average_Labor_Hours_Per_Operation))
+
+
+ggplot(labor_hours_per_operation_analysis, aes(x = reorder(STATE_NAME, Average_Labor_Hours_Per_Operation), y = Average_Labor_Hours_Per_Operation)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Average Labor Hours per Operation by State in 2017",
+       x = "State",
+       y = "Average Labor Hours per Operation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+When looking at the different states of the United States, a question that would be interesting to know is how different the average values of labor operations differ across the,. In our case, we are looking at the year 2017 specifically. Here, we want to see which states show proof of the highest labor hours per operation throughout that year. From the results, we can see that California has the highest average labor hours per operation, which seems reasonable. There are different factors that affect these labor hours, like the type of crops grown, the geographical location, and the variety of high-grown crops. On the opposite side of the graph, we can see that Alaska has the least average labor hours per operation, which makes sense. Due to the cold weather, agricultural practices are barely performed as it would be hard. In conclusion, this graph helps show which states have the highest average labor hours operations versus the lowest, ranking them in order.
