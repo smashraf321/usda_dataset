@@ -62,18 +62,18 @@ if (!file.exists(usda_dataset))
 }
 
 # This step takes a while when knitting so please be patient
-suppressWarnings(data_usda <- read.delim(gzfile(usda_dataset)))
+suppressWarnings(data_usda_full <- read.delim(gzfile(usda_dataset)))
 
 ```
 
 ```{r, message=FALSE, echo=FALSE}
 
-length(colnames(data_usda))
+length(colnames(data_usda_full))
 # We have 39 columns in our dataset
 
-dim(data_usda)
+dim(data_usda_full)
 
-colnames(data_usda)
+colnames(data_usda_full)
 ```
 
 
@@ -83,7 +83,7 @@ We see we have 39 columns containing lots of valuable information.-
 
 # Select most important columns
 
-data_usda <- data_usda %>% select(SOURCE_DESC, GROUP_DESC,
+data_usda <- data_usda_full %>% select(SOURCE_DESC, GROUP_DESC,
                      COMMODITY_DESC, STATISTICCAT_DESC, AGG_LEVEL_DESC, DOMAIN_DESC,
                      COUNTRY_NAME, STATE_NAME,
                      YEAR, REFERENCE_PERIOD_DESC, VALUE, UNIT_DESC)
@@ -237,6 +237,7 @@ testt %>% ggplot(aes(x = YEAR, y = land_area)) + geom_bar(stat = "identity", aes
 
 
 ```
+
 ### Analysis:
 
 - Downward trend of natural harvest over the years - Texas
@@ -301,10 +302,6 @@ data_usda_ENERGY_TEXAS <- data_usda_ENERGY %>% filter(STATE_NAME == "TEXAS", AGG
                                                                  ,UNIT_DESC == "$ / OPERATION"
                                                                  )
 
-unique(data_usda_ENERGY_TEXAS$YEAR)
-
-
-
 
 #View(data_usda_AG_LAND_AREA_IOWA)
 
@@ -324,6 +321,7 @@ testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(st
 
 #data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
 ```
+
 ### Iowa VS Texas
 
 - Iowa spends more dollars per operations than Texas.
@@ -413,15 +411,15 @@ I chose this type of graph because it is easier to read the data from. It does n
 
 ```{r, message=FALSE, echo=FALSE}
 
-data_usda_preview <- data_usda %>% 
+data_usda_preview <- data_usda_full %>% 
   select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC)
 
-str(data_usda_preview)
+#str(data_usda_preview)
 
-data_usda_preview %>% head(n = 20)
+#data_usda_preview %>% head(n = 20)
 ```
 
-```{r}
+```{r, message=FALSE, echo=FALSE}
 library(dplyr)
 
 
@@ -449,7 +447,7 @@ library(ggplot2)
 
 # Assuming 'data_usda_preview' is already loaded and contains the necessary columns
 # Filter for 'CATTLE' at the national level
-national_cattle_data <- data_usda_cp %>%
+national_cattle_data <- data_usda_preview %>%
   filter(COMMODITY_DESC == "CATTLE", STATE_NAME == "US TOTAL") %>%
   mutate(YEAR = as.numeric(YEAR),  # Ensure YEAR is numeric
          VALUE = as.numeric(gsub("[^0-9.]", "", VALUE)))  # Clean and convert VALUE to numeric
@@ -479,7 +477,7 @@ ggplot(cattle_trends_national, aes(x = YEAR, y = Total_Value)) +
 How does the distribution of agricultural expenses vary across different states in the United States over the years?
 
 ```{r, message=FALSE, echo=FALSE}
-agri_expenses <- data_usda %>%
+agri_expenses <- data_usda_full %>%
   filter(GROUP_DESC == "EXPENSES")
 
 agg_expenses <- agri_expenses %>%
@@ -500,7 +498,7 @@ ggplot(agg_expenses, aes(x = YEAR, y = total_expenses, color = STATE_NAME)) +
 
 
 # Filter the data to include only expenses
-agri_expenses <- data_usda %>%
+agri_expenses <- data_usda_full %>%
   filter(GROUP_DESC == "EXPENSES")
 
 # Group by state and year, then calculate total expenses
@@ -529,7 +527,7 @@ ggplot(agg_expenses, aes(x = YEAR, y = as.numeric(total_expenses), color = STATE
 library(dplyr)
 
 
-data_usda_agexp <- data_usda %>%
+data_usda_agexp <- data_usda_full %>%
   mutate(VALUE = gsub("[^0-9.]", "", VALUE),  # Remove non-numeric characters, keep digits and decimal points
          VALUE = as.numeric(VALUE))  # Convert the cleaned string to numeric
 selected_states_data <- data_usda_agexp %>%
@@ -546,7 +544,9 @@ print(expenses_by_sector)
 
 library(ggplot2)
 
-ggplot(expenses_by_sector, aes(x = GROUP_DESC, y = Total_Expenses, fill = STATE_NAME)) +
+expenses_by_sector %>% filter(GROUP_DESC != "ENERGY",
+                              GROUP_DESC != "IRRIGATION",
+                              GROUP_DESC != "PRICES PAID") %>% ggplot(aes(x = GROUP_DESC, y = Total_Expenses, fill = STATE_NAME)) +
   geom_bar(stat = "identity", position = position_dodge()) +
   labs(title = "Total Agricultural Expenses by Sector and State",
        x = "Group Description",
@@ -575,7 +575,7 @@ Introduction of high-yield crop varieties, chemical fertilizers, and advanced fa
 ### Future Benefits:
 By studying these changes, policymakers, researchers, and stakeholders can better understand the pressures on agricultural systems and make informed decisions that balance productivity with sustainability and economic viability.
 
-```{r}
+```{r, message=FALSE, echo=FALSE}
 library(data.table)
 library(dplyr)
 library(ggplot2)
@@ -584,7 +584,7 @@ library(ggplot2)
 # Question 1: How has the total agricultural production changed over the years?
 
 
-data_usda_a <- data_usda %>%
+data_usda_a <- data_usda_full %>%
   select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC) %>%
   mutate(VALUE = as.numeric(VALUE))
 
@@ -617,14 +617,14 @@ ggplot(production_over_years, aes(x = YEAR, y = Total_Production)) +
 
 As shown from the figure, there is a quite obvious increase in production as the years have gone by. As obvious, there is going to be a slow start as agricultural practices, technological advances, and farming practices were not as popular. We can even presume that it was very low to the point agriculture was barely economically beneficial. As the years go by, new methods, technologies, and practices are introduced, so that explains the rapid incline of total agricultural production.
 
-```{r}
+```{r, message=FALSE, echo=FALSE}
 # Question 2: What are the average values of labor operations across states for 2017?
 
 library(dplyr)
 library(ggplot2)
 
 
-labor_hours_per_operation_analysis <- data_usda %>%
+labor_hours_per_operation_analysis <- data_usda_full %>%
   filter(COMMODITY_DESC == "LABOR", 
          YEAR == 2017, 
          UNIT_DESC == "OPERATIONS", 
