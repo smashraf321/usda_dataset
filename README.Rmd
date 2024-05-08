@@ -1,0 +1,485 @@
+---
+title: 'DS 202 - Project Proposal'
+author: "Save Gaza"
+output: html_document
+date: "03-29-2024"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analysis of agricultural economics statistics in the US
+
+We want to analyze the agricultural economics statistics in the US. We are using [real world data](https://www.nass.usda.gov/datasets/) from the USDA NASS. 
+Our specific dataset is `qs.economics_20240329.gz`
+
+## Team Members
+
+Hazer Becic, Ashraf Shaikh Mohammed, Luis Hinkhouse, Mohamed Bashier, Mazin Bashier.
+
+## Data
+
+Our data is present as a zipped txt file in tab separated format. It appears the data is relatively clean on the first glance, so we assume not much intensive data cleaning needs to be done.
+
+There's [accompanying documentation](https://quickstats.nass.usda.gov/src/glossary.pdf) to understand certain values in our dataset.
+
+```{r, message=FALSE, echo=FALSE}
+
+library(rvest)
+library(tidyverse)
+library(ggplot2)
+
+url <- "https://www.nass.usda.gov/datasets/"
+html_content <- read_html(url)
+text_strings <- html_content %>% html_nodes("div") %>% lapply(function(x) {x %>% html_text() %>% trimws()})
+pattern <- "^qs\\.economics_\\d+\\.txt\\.gz$"
+matches <- regmatches(text_strings, regexpr(pattern, text_strings))
+print(matches)
+data_url <- paste("https://www.nass.usda.gov/datasets/", matches, sep = "")
+print(data_url)
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+options(timeout=120)
+
+usda_dataset <- matches
+#usda_dataset <- 'qs.economics_20240329.txt.gz'
+if (!file.exists(usda_dataset))
+{
+  download.file(data_url, destfile = usda_dataset, mode = 'wb')
+}
+
+# This step takes a while so please be patient
+suppressWarnings(data_usda <- read.delim(gzfile(usda_dataset)))
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+#nrow(data_usda)
+# We have a whopping 11,695,604 rows in our dataset
+
+#length(colnames(data_usda))
+# We have 39 columns in our dataset
+
+#dim(data_usda)
+
+colnames(data_usda)
+```
+
+
+We see we have 39 columns containing lots of valuable information. We shall now see a preview of certain columns.
+
+```{r, message=FALSE, echo=FALSE}
+# Preview certain columns
+data_usda_preview <- data_usda %>% 
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC, COUNTRY_NAME)
+
+str(data_usda_preview)
+
+data_usda_preview %>% head(n = 20)
+
+
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+
+# Select most important columns
+
+data_usda <- data_usda %>% select(SOURCE_DESC, GROUP_DESC,
+                     COMMODITY_DESC, STATISTICCAT_DESC, AGG_LEVEL_DESC, DOMAIN_DESC,
+                     COUNTRY_NAME, STATE_NAME,
+                     FREQ_DESC, YEAR, REFERENCE_PERIOD_DESC, VALUE, UNIT_DESC)
+
+# REFERENCE_PERIOD_DESC - for months
+# VALUE - remove D's, replace commas
+# FREQ_DESC -
+# YEAR -
+# COMMODITY_DESC -
+# STATISTICCAT_DESC - higher level of DOMAIN_DESC
+# COUNTRY_NAME -
+# STATE_NAME - ignore "" empty state; US TOTAL and OTHER STATES for statewise analysis
+# UNIT_DESC -
+# GROUP_DESC -
+# SOURCE_DESC - let's only care about census data
+# AGG_LEVEL_DESC -
+# DOMAIN_DESC - maybe but mostly yes, seems more detailed than STATISTICCAT_DESC
+
+# CLASS_DESC maybe, not so important
+# PRODN_PRACTICE_DESC maybe, not so important
+# UTIL_PRACTICE_DESC maybe, not so important
+
+
+
+data_usda <- data_usda %>% filter(SOURCE_DESC == "CENSUS",
+                                  COUNTRY_NAME == "UNITED STATES",
+                                  VALUE != "(D)") %>% select(-c(SOURCE_DESC, COUNTRY_NAME))
+
+data_usda <- data_usda %>% filter(STATE_NAME != "",
+                                  REFERENCE_PERIOD_DESC == "YEAR") %>% select(-c(REFERENCE_PERIOD_DESC))
+
+data_usda <- data_usda %>% select(-c(FREQ_DESC))
+
+
+#head(data_usda$VALUE, 200)
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+colnames(data_usda)
+
+#data_usda %>% select(-c(VALUE, STATISTICCAT_DESC, DOMAIN_DESC, COMMODITY_DESC)) %>% sapply(unique)
+
+data_usda_test <- data_usda %>% filter(GROUP_DESC == "ENERGY"
+#                                       ,COMMODITY_DESC == "AG LAND",
+#                                       ,STATISTICCAT_DESC == "AREA",
+#                                       ,DOMAIN_DESC == "AREA OPERATED" | DOMAIN_DESC == "AREA" | DOMAIN_DESC == "AREA HARVESTED"
+)
+
+
+#unique(data_usda$YEAR)
+#unique(data_usda$UNIT_DESC)
+print("------GROUP_DESC------")
+unique(data_usda_test$GROUP_DESC)
+print("------COMMODITY_DESC------")
+unique(data_usda_test$COMMODITY_DESC)
+print("------STATISTICCAT_DESC------")
+unique(data_usda_test$STATISTICCAT_DESC)
+print("------AGG_LEVEL_DESC------")
+unique(data_usda_test$AGG_LEVEL_DESC)
+print("------DOMAIN_DESC------")
+unique(data_usda_test$DOMAIN_DESC)
+print("------UNIT_DESC------")
+unique(data_usda$UNIT_DESC)
+
+#data_usda_test <- data_usda_test %>% filter(STATE_NAME == "IOWA", AGG_LEVEL_DESC == "STATE")
+dim(data_usda_test)
+
+# do like convert years, states to factors, etc.
+# now our data is ready for analysis
+```
+
+## Questions to be addressed
+
+We want to see what agricultural economic sectors are present in various states in the US as well as their growth/decline over the years.
+
+```{r, message=FALSE, echo=FALSE}
+
+data_usda_AG_LAND_AREA <- data_usda %>% filter(GROUP_DESC == "FARMS & LAND & ASSETS"
+                                       ,COMMODITY_DESC == "AG LAND"
+                                       ,STATISTICCAT_DESC == "AREA"
+                                       )
+
+data_usda_AG_LAND_AREA_IOWA <- data_usda_AG_LAND_AREA %>% filter(STATE_NAME == "IOWA", AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "ACRES"
+                                                                 )
+
+unique(data_usda_AG_LAND_AREA_IOWA$DOMAIN_DESC)
+
+data_usda_AG_LAND_AREA_IOWA <- data_usda_AG_LAND_AREA_IOWA %>% filter(
+  DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
+)
+
+
+#View(data_usda_AG_LAND_AREA_IOWA)
+
+# only do numeric conversion here
+data_usda_AG_LAND_AREA_IOWA$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_AG_LAND_AREA_IOWA$VALUE))
+
+testt <- data_usda_AG_LAND_AREA_IOWA %>%
+  group_by(YEAR, DOMAIN_DESC) %>%
+  summarize(land_area = sum(VALUE)) 
+
+#View(testt)
+
+testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") #+ coord_flip()
+
+
+#data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+data_usda_AG_LAND_AREA <- data_usda %>% filter(GROUP_DESC == "FARMS & LAND & ASSETS"
+                                       ,COMMODITY_DESC == "AG LAND"
+                                       ,STATISTICCAT_DESC == "AREA"
+                                       )
+
+data_usda_AG_LAND_AREA_NEBRASKA <- data_usda_AG_LAND_AREA %>% filter(STATE_NAME == "NEBRASKA", AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "ACRES"
+                                                                 )
+
+unique(data_usda_AG_LAND_AREA_NEBRASKA$DOMAIN_DESC)
+
+data_usda_AG_LAND_AREA_NEBRASKA <- data_usda_AG_LAND_AREA_NEBRASKA %>% filter(
+  DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
+)
+
+
+#View(data_usda_AG_LAND_AREA_IOWA)
+
+# only do numeric conversion here
+data_usda_AG_LAND_AREA_NEBRASKA$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_AG_LAND_AREA_NEBRASKA$VALUE))
+
+testt <- data_usda_AG_LAND_AREA_NEBRASKA %>%
+  group_by(YEAR, DOMAIN_DESC) %>%
+  summarize(land_area = sum(VALUE)) 
+
+#View(testt)
+
+testt %>% ggplot(aes(x = factor(YEAR), y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") #+ coord_flip()
+
+
+#data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
+
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+
+data_usda_AG_LAND_AREA_2 <- data_usda %>% filter(GROUP_DESC == "FARMS & LAND & ASSETS"
+                                       ,COMMODITY_DESC == "AG LAND"
+                                       ,STATISTICCAT_DESC == "AREA"
+                                       )
+
+data_usda_AG_LAND_AREA_2 <- data_usda_AG_LAND_AREA_2 %>% filter(AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "ACRES"
+                                                                 )
+
+unique(data_usda_AG_LAND_AREA_2$DOMAIN_DESC)
+
+data_usda_AG_LAND_AREA_2 <- data_usda_AG_LAND_AREA_2 %>% filter(
+  DOMAIN_DESC == "AREA CROPLAND, HARVESTED" | DOMAIN_DESC == "AREA OPERATED AND AREA CROPLAND, HARVESTED"
+)
+
+
+#View(data_usda_AG_LAND_AREA_IOWA)
+
+# only do numeric conversion here
+data_usda_AG_LAND_AREA_2$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_AG_LAND_AREA_2$VALUE))
+
+testt <- data_usda_AG_LAND_AREA_2 %>%
+  group_by(YEAR, STATE_NAME, DOMAIN_DESC) %>%
+  summarize(land_area = sum(VALUE)) 
+
+#View(testt)
+options(repr.plot.width = 30, repr.plot.height = 30)
+
+testt %>% ggplot(aes(x = YEAR, y = land_area)) + geom_bar(stat = "identity", aes(fill = DOMAIN_DESC), position = "dodge") + facet_wrap(~STATE_NAME, scales = "fixed") + theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 5)) 
+
+
+#data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
+
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+data_usda_ENERGY <- data_usda %>% filter(GROUP_DESC == "ENERGY"
+                                       ,COMMODITY_DESC == "ENERGY"
+                                       ,STATISTICCAT_DESC == "EXPENSE" | STATISTICCAT_DESC == "SAVINGS"
+                                       )
+
+data_usda_ENERGY_IOWA <- data_usda_ENERGY %>% filter(STATE_NAME == "IOWA", AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "$ / OPERATION"
+                                                                 )
+
+# only do numeric conversion here
+data_usda_ENERGY_IOWA$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_ENERGY_IOWA$VALUE))
+
+testt <- data_usda_ENERGY_IOWA %>%
+  group_by(YEAR, STATISTICCAT_DESC) %>%
+  summarize(dollars_per_operation = sum(VALUE)) 
+
+
+
+testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") #+ coord_flip()
+
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+data_usda_ENERGY <- data_usda %>% filter(GROUP_DESC == "ENERGY"
+                                       ,COMMODITY_DESC == "ENERGY"
+                                       ,STATISTICCAT_DESC == "EXPENSE" | STATISTICCAT_DESC == "SAVINGS"
+                                       )
+
+data_usda_ENERGY_TEXAS <- data_usda_ENERGY %>% filter(STATE_NAME == "TEXAS", AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "$ / OPERATION"
+                                                                 )
+
+unique(data_usda_ENERGY_TEXAS$YEAR)
+
+
+
+
+#View(data_usda_AG_LAND_AREA_IOWA)
+
+# only do numeric conversion here
+data_usda_ENERGY_TEXAS$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_ENERGY_TEXAS$VALUE))
+
+testt <- data_usda_ENERGY_TEXAS %>%
+  group_by(YEAR, STATISTICCAT_DESC) %>%
+  summarize(dollars_per_operation = sum(VALUE)) 
+
+#View(testt)
+
+testt %>% ggplot(aes(x = factor(YEAR), y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") #+ coord_flip()
+
+
+#data_usda_AG_LAND_AREA_IOWA %>% ggplot(aes(x = YEAR, y = VALUE, color = DOMAIN_DESC)) + geom_point()
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+data_usda_ENERGY <- data_usda %>% filter(GROUP_DESC == "ENERGY"
+                                       ,COMMODITY_DESC == "ENERGY"
+                                       ,STATISTICCAT_DESC == "EXPENSE" | STATISTICCAT_DESC == "SAVINGS"
+                                       )
+
+data_usda_ENERGY_ALL <- data_usda_ENERGY %>% filter(AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "$ / OPERATION"
+                                                                 )
+
+# only do numeric conversion here
+data_usda_ENERGY_ALL$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_ENERGY_ALL$VALUE))
+
+testt <- data_usda_ENERGY_ALL %>%
+  group_by(YEAR, STATE_NAME, STATISTICCAT_DESC) %>%
+  summarize(dollars_per_operation = sum(VALUE)) 
+
+options(repr.plot.width = 30, repr.plot.height = 30)
+
+testt %>% ggplot(aes(x = YEAR, y = dollars_per_operation)) + geom_bar(stat = "identity", aes(fill = STATISTICCAT_DESC), position = "dodge") + facet_wrap(~STATE_NAME, scales = "fixed") + theme_minimal() + theme(legend.position = "bottom", text = element_text(size = 5))
+
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+data_usda_ENERGY <- data_usda %>% filter(GROUP_DESC == "ENERGY"
+                                       ,COMMODITY_DESC == "ENERGY"
+                                       ,STATISTICCAT_DESC == "EXPENSE" | STATISTICCAT_DESC == "SAVINGS"
+                                       )
+
+data_usda_ENERGY_ALL <- data_usda_ENERGY %>% filter(AGG_LEVEL_DESC == "STATE"
+                                                                 ,UNIT_DESC == "$ / OPERATION"
+                                                                 )
+
+# only do numeric conversion here
+data_usda_ENERGY_ALL$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_ENERGY_ALL$VALUE))
+
+data_usda_ENERGY_ALL_SAVINGS <- data_usda_ENERGY_ALL %>% filter(STATISTICCAT_DESC == "SAVINGS") 
+
+data_usda_ENERGY_ALL_SAVINGS %>% group_by(STATE_NAME) %>% summarize(dollars_per_operation = sum(VALUE)) %>% 
+  ggplot(aes(x = reorder(STATE_NAME,-dollars_per_operation), y = dollars_per_operation)) + geom_bar(stat = "identity") + coord_flip() + theme(text = element_text(size = 5))
+
+data_usda_ENERGY_ALL_EXPENSES <- data_usda_ENERGY_ALL %>% filter(STATISTICCAT_DESC == "EXPENSE")
+
+data_usda_ENERGY_ALL_EXPENSES %>% group_by(STATE_NAME) %>% summarize(dollars_per_operation = sum(VALUE)) %>% 
+  ggplot(aes(x = reorder(STATE_NAME,-dollars_per_operation), y = dollars_per_operation)) + geom_bar(stat = "identity") + coord_flip() + theme(text = element_text(size = 5))
+
+```
+
+## MAZIN MOHAMMED
+
+```{r, message=FALSE, echo=FALSE}
+data_usda_preview$VALUE <- as.numeric(gsub("[^0-9.]", "", data_usda_preview$VALUE))
+
+
+cattle_data <- data_usda_preview %>%
+  filter(COMMODITY_DESC == "CATTLE") %>%
+  select(COMMODITY_DESC, YEAR, STATE_NAME, VALUE, UNIT_DESC) %>%
+  mutate(VALUE = as.numeric(VALUE)) 
+average_cattle_value_by_state <- cattle_data %>%
+  group_by(STATE_NAME) %>%
+  summarise(Average_Value = mean(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(desc(Average_Value))
+
+
+print(head(average_cattle_value_by_state, n = 20))
+```
+
+```{r, message=FALSE, echo=FALSE}
+# Assuming 'data_usda_preview' is already loaded and contains the necessary columns
+# Filter for 'CATTLE' at the national level
+national_cattle_data <- data_usda_preview %>%
+  filter(COMMODITY_DESC == "CATTLE", STATE_NAME == "US TOTAL") %>%
+  mutate(YEAR = as.numeric(YEAR),  # Ensure YEAR is numeric
+         VALUE = as.numeric(gsub("[^0-9.]", "", VALUE)))  # Clean and convert VALUE to numeric
+
+# Calculate the total production value by year for 'CATTLE' at the national level
+cattle_trends_national <- national_cattle_data %>%
+  group_by(YEAR) %>%
+  summarise(Total_Value = sum(VALUE, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(YEAR)
+
+# Plot the trend over years
+ggplot(cattle_trends_national, aes(x = YEAR, y = Total_Value)) +
+  geom_line() +
+  geom_point() +  # Add points to visualize each year's data
+  theme_minimal() +
+  labs(title = "Trend of Cattle Production Value at the National Level",
+       x = "Year",
+       y = "Total Production Value ($)")
+```
+
+
+## Hazer Becic
+Question: How does the distribution of agricultural expenses vary across different states in the United States over the years?
+
+```{r, message=FALSE, echo=FALSE}
+agri_expenses <- data_usda %>%
+  filter(GROUP_DESC == "EXPENSES")
+
+agg_expenses <- agri_expenses %>%
+  group_by(STATE_NAME, YEAR) %>%
+  summarise(total_expenses = sum(as.numeric(gsub(",", "", VALUE))))
+
+# HAS WARNINGS  
+ggplot(agg_expenses, aes(x = YEAR, y = total_expenses, color = STATE_NAME)) +
+  geom_line() +
+  labs(title = "Total Agricultural Expenses Over Years by State",
+       x = "Year",
+       y = "Total Expenses",
+       color = "State") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Adjusts the legend position to the bottom
+```
+
+
+
+Question: What are the main drivers of agricultural income variation across different regions in the United States, and how have these drivers evolved over time? 
+```{r, message=FALSE, echo=FALSE}
+agri_income <- data_usda %>%
+  filter(GROUP_DESC == "INCOME")
+
+# DOESN'T WORK
+# Step 2: Explore the distribution of agricultural income across different regions and years
+income_summary <- agri_income %>%
+  group_by(REGION_DESC, YEAR) %>%
+  summarise(total_income = sum(as.numeric(gsub(",", "", VALUE))))
+
+# Step 3: Correlation analysis - Identify potential drivers of income variation
+# For example, let's explore the correlation between income and commodity prices
+# Assuming you have another dataset named commodity_prices containing commodity price data
+
+# Merge commodity price data with income data based on common variables (e.g., year and commodity)
+merged_data <- inner_join(income_summary, commodity_prices, by = c("YEAR", "COMMODITY_DESC"))
+
+# Calculate correlation between income and commodity prices
+correlation <- cor(merged_data$total_income, merged_data$price)
+
+# Step 4: Data Visualization
+# Plotting total agricultural income over the years for each region
+ggplot(income_summary, aes(x = YEAR, y = total_income, color = REGION_DESC)) +
+  geom_line() +
+  labs(title = "Total Agricultural Income Over Years by Region",
+       x = "Year",
+       y = "Total Income",
+       color = "Region") +
+  theme_minimal()
+```
